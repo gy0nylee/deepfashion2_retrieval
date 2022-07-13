@@ -1,0 +1,10 @@
+click~=7.1.2
+numpy>=1.19.1
+
+tqdm~=4.49.0
+opencv-python>=4.3.0.36
+setuptools>=49.2.1
+
+torchvision>=0.5.0
+pandas>=1.2.0
+matplotlib
