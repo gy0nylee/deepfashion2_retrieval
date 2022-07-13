@@ -24,7 +24,7 @@ img2.save(os.path.join('validation', 'validation','cropped', str(pair_id)+'_'+st
 
 #  pair_id_style_파일명_item명.jpg
 #  validation
-
+'''
 all_files = os.listdir(os.path.join('validation', 'validation', 'image'))
 for file in tqdm(all_files):
     count = 0
@@ -44,7 +44,7 @@ for file in tqdm(all_files):
                     img2 = img.crop((a,b,c,d))
                     img2.save(os.path.join('validation', 'validation', 'cropped', str(pair_id)+'_'+str(anno[i]['style'])+'_'+os.path.splitext(file)[0]+'_'+f'{i}'+'.jpg'), 'JPEG')
 
-
+'''
 #  train
 
 all_files = os.listdir(os.path.join('train', 'train', 'image'))
@@ -64,7 +64,10 @@ for file in tqdm(all_files):
                 else:
                     a, b, c, d = anno[i]['bounding_box']
                     img2 = img.crop((a, b, c, d))
-                    img2.save(os.path.join('train', 'train', 'cropped',
-                                           str(pair_id) + '_' + str(anno[i]['style']) + '_' + os.path.splitext(file)[
-                                               0] + '_' + f'{i}' + '.jpg'), 'JPEG')
+                    try:
+                        img2.save(os.path.join('train', 'train', 'cropped',
+                                               str(pair_id) + '_' + str(anno[i]['style']) + '_' + os.path.splitext(file)[
+                                                   0] + '_' + f'{i}' + '.jpg'), 'JPEG')
+                    except ValueError as m:
+                        print(m)
 
