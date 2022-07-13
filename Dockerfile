@@ -1,4 +1,4 @@
-FROM python:3.9.2-slim
+FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-runtime
 RUN apt-get update
 WORKDIR /deepfashion2
 COPY requirements.txt requirements.txt

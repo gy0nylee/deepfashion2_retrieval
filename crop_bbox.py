@@ -32,7 +32,6 @@ for file in tqdm(all_files):
     image_name = os.path.join('validation', 'validation', 'image', file)
     if int(os.path.splitext(file)[0]) >= 0:
         img = Image.open(image_name)
-        width, height = img.size
         with open(json_name, 'r') as f:
             anno = json.loads(f.read())
             pair_id = anno['pair_id']
@@ -49,15 +48,14 @@ for file in tqdm(all_files):
 #  train
 all_files = os.listdir(os.path.join('train', 'train', 'image'))
 for file in tqdm(all_files):
-    count = 0
     json_name = os.path.join('train', 'train', 'annos', os.path.splitext(file)[0] + '.json')
     image_name = os.path.join('train', 'train', 'image', file)
     if int(os.path.splitext(file)[0]) >= 0:
         img = Image.open(image_name)
-        width, height = img.size
         with open(json_name, 'r') as f:
             anno = json.loads(f.read())
             pair_id = anno['pair_id']
+            source = anno['source']
             for i in anno:
                 if i == 'source' or i == 'pair_id':
                     continue
