@@ -59,8 +59,8 @@ for i in tqdm(whole_images):
                     if i['pair_id'] == j['pair_id'] and i['style'] == j['style']:
                         positive_pairs_ids.append((i['idx'], j['idx']))
                         shop_idx.remove(j['idx'])
-                        nega_sample = random.sample(shop_idx,1)      # positive item 이외의 shop idx에서 random sampling
-                        negative_pairs_ids.append((i['idx'], nega_sample))
+                        neg_sample = random.sample(shop_idx,1)      # positive item 이외의 shop idx에서 random sampling
+                        negative_pairs_ids.append((i['idx'], neg_sample))
 
 '''
 

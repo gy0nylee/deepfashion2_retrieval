@@ -60,12 +60,15 @@ for file in tqdm(all_files):
                 if i == 'source' or i == 'pair_id':
                     continue
                 else:
-                    a, b, c, d = anno[i]['bounding_box']
-                    img2 = img.crop((a, b, c, d))
-                    try:
-                        img2.save(os.path.join('train', 'train', 'cropped',
-                                               str(pair_id) + '_' + str(anno[i]['style']) + '_' + source + '_' + os.path.splitext(file)[
-                                                   0] + '_' + f'{i}' +'_' + str(anno[i]['category_id']) + '.jpg'), 'JPEG')
-                    except ValueError as m:
-                        print(m)
-
+                    if anno[i]['bounding_box'] == [0,0,0,0]:
+                        print('skipped')
+                        continue
+                    else:
+                        a, b, c, d = anno[i]['bounding_box']
+                        img2 = img.crop((a, b, c, d))
+                        try:
+                            img2.save(os.path.join('train', 'train', 'cropped',
+                                                   str(pair_id) + '_' + str(anno[i]['style']) + '_' + source + '_' + os.path.splitext(file)[
+                                                       0] + '_' + f'{i}' +'_' + str(anno[i]['category_id']) + '.jpg'), 'JPEG')
+                        except ValueError as m:
+                            print(m)
