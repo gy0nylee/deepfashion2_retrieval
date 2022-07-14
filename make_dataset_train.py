@@ -183,7 +183,9 @@ def train(epoch, k=10):
     topk_idx_list = []
     train_losses = []
     val_losses = []
-    for data in tqdm(train_loader):
+
+    pbar = tqdm(train_loader)
+    for batch, data in enumerate(pbar):
         optimizer.zero_grad()
         u, sp, sn = data
         output1 = model(u.cuda())
@@ -191,19 +193,22 @@ def train(epoch, k=10):
         output3 = model(sn.cuda())
         loss = triplet_loss(output1, output2, output3)
         train_loss += loss.item()
+        pbar.set_description(f'training - loss: {train_loss / (batch + 1)}')
         loss.backward()
         optimizer.step()
     train_losses.append(train_loss)
 
     model.eval()
     with torch.no_grad():
-        for data in tqdm(val_loader):
+        pbar = tqdm(val_loader)
+        for batch, data in enumerate(pbar):
             u, sp, sn = data
             output1 = model(u.cuda())
             output2 = model(sp.cuda())
             output3 = model(sn.cuda())
             loss = triplet_loss(output1, output2, output3)
             val_loss += loss.item()
+            pbar.set_description(f'validation - loss: {val_loss / (batch + 1)}')
 
         gallery_dict = {}
         for img, idx in tqdm(val_loader_g, desc='extracting gallery features'):
