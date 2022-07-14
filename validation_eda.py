@@ -79,7 +79,7 @@ for file in tqdm(all_files):
                     count += 1
             item_count.append(count)
 
-print(Counter(item_count)) # Counter({2: 18787, 1: 12684, 3: 498, 4: 182, 5: 2})
+print(Counter(item_count)) # Counter({2: 18787, 1: 12684, 3: 498, 4: 182, 5: 2}) image 당 item 개수
 
 
 
