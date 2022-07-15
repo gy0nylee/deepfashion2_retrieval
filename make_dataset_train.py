@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms
 from torchvision.utils import make_grid
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, random_split, default_convert
 from torch.autograd import Variable
 from PIL import Image
 import numpy as np
@@ -16,7 +16,7 @@ from tqdm import tqdm
 import os
 import random
 import pickle
-
+from collate_modified import modified_collate
 
 
 with open('pairs_train.pickle','rb') as f:
@@ -78,43 +78,39 @@ transforms = transforms.Compose([
     transforms.ToTensor()
 ])
 
-# query 이미지, ground-truth pair idx(여러개)
-class queryData(Dataset):
-    def __init__(self, user_idx, pairs, img_paths, set):
-        self.user_idx = user_idx
+#  transforms.Normalize(mean=( , , ), std = ( , , )
+
+
+class RetrievalData(Dataset):
+    def __init__(self, idx_set ,source, pairs, transform, img_paths, set):
+        self.idx_set = idx_set
+        self.source = source
         self.pairs = pairs
+        self.transform = transform
         self.img_paths = img_paths
         self.set = set
 
     def __len__(self):
-        return len(self.user_idx)
+        return len(self.idx_set)
 
     def __getitem__(self, i):
-        query_img = Image.open(os.path.join(self.set, self.set, 'cropped', self.img_paths[self.user_idx[i]]))
-        true_idcs = [pair['p'][1] for pair in self.pairs if pair['p'][0] == self.user_idx[i]] # true indices
-        return query_img, true_idcs
+        img = Image.open(os.path.join(self.set, self.set, 'cropped', self.img_paths[self.idx_set[i]]))
+        if self.transform is not None:
+            img = self.transform(img)
 
+        if self.source == 'user' :
+            true_idcs = [pair['p'][1] for pair in self.pairs if pair['p'][0] == self.idx_set[i]] # true indices
+            return img, true_idcs
 
-# gallery 이미지, idx
-class galleryData(Dataset):
-    def __init__(self, shop_idx, img_paths, set):
-        self.shop_idx = shop_idx
-        self.img_paths = img_paths
-        self.set = set
-
-    def __len__(self):
-        return len(self.shop_idx)
-
-    def __getitem__(self, i):
-        gallery_img = Image.open(os.path.join(self.set, self.set, 'cropped', self.img_paths[self.shop_idx[i]]))
-        gallery_idx = self.shop_idx[i]
-
-        return gallery_img, gallery_idx
+        else:
+            gallery_idx = self.idx_set[i]
+            return img, gallery_idx
 
 
 # img_paths
 train_paths = os.listdir(os.path.join('train', 'train', 'cropped'))
 test_paths = os.listdir(os.path.join('validation', 'validation', 'cropped'))
+
 
 # Dataloader
 batch_size = 32
@@ -125,13 +121,11 @@ weight_decay = 0
 
 train_ds_t = TripletData(pairs=pairs_train[:10000], transform=transforms, img_paths=train_paths, set='train')
 val_ds_t = TripletData(pairs=pairs_validation[:2000], transform=transforms, img_paths=train_paths, set='train')
-test_ds_t = TripletData(pairs=pairs_test, transform=transforms, img_paths=test_paths, set='validation')
+val_ds_q = RetrievalData(idx_set=user_idx_val, source = 'user', pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
+val_ds_g = RetrievalData(idx_set=shop_idx_val, source = 'shop', pairs=None, transform=transforms, img_paths=train_paths, set='train')
 
-val_ds_q = queryData(user_idx=user_idx_val[:2000], pairs=pairs_validation, img_paths=train_paths, set='train')
-test_ds_q = queryData(user_idx=user_idx_test, pairs=pairs_test, img_paths=test_paths, set='validation')
 
-val_ds_g = galleryData(shop_idx=shop_idx_val, img_paths=train_paths, set='train')
-test_ds_g = galleryData(shop_idx=shop_idx_test, img_paths=test_paths, set='validation')
+train_ds_t
 
 
 '''
@@ -159,13 +153,13 @@ patience = 3
 
 train_loader = DataLoader(train_ds_t, batch_size=batch_size, num_workers=num_workers, pin_memory=True, shuffle=True)
 val_loader = DataLoader(val_ds_t, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
-test_loader = DataLoader(test_ds_t, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
+#test_loader = DataLoader(test_ds_t, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
-val_loader_q = DataLoader(val_ds_q, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
+val_loader_q = DataLoader(val_ds_q, batch_size=batch_size, num_workers=num_workers, pin_memory=True, collate_fn = modified_collate()) # 아직 에러남.....
 val_loader_g = DataLoader(val_ds_g, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
-test_loader_q = DataLoader(test_ds_q, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
-test_loader_g = DataLoader(test_ds_g, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
+#test_loader_q = DataLoader(test_ds_q, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
+#test_loader_g = DataLoader(test_ds_g, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
 
 def TopkAccuracy(true_idcs_list,topk_idx_list):
@@ -174,7 +168,7 @@ def TopkAccuracy(true_idcs_list,topk_idx_list):
         # true idcs중 하나라도 topk_idx_list에 있으면 +1
         if len(set(true_idcs_list[i]).intersection(topk_idx_list[i])) > 0 :
            acc += 1
-    return acc/len(true_idx_list)
+    return acc/len(true_idcs_list)
 
 
 

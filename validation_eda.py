@@ -9,12 +9,10 @@ import matplotlib.pyplot as plt
 
 
 # Train
-#json_name = os.path.join('deepfashion2_coco_' + 'train' + '.json')
-#with open(json_name, 'r') as f:
-#    train_js = json.loads(f.read())
-
-
-
+json_name = os.path.join('deepfashion2_coco_' + 'train' + '.json')
+with open(json_name, 'r') as f:
+    train_js = json.loads(f.read())
+'''
 # image 개수 : => # of images: 191961
 #print('# of images:', len(train_js['images']))
 # image 크기 분포
@@ -23,31 +21,67 @@ import matplotlib.pyplot as plt
 #    train_images['width'].append(image['width'])
 #    train_images['height'].append(image['height'])
 
+all_files = os.listdir(os.path.join('train', 'train', 'image'))
+val = []
+item_count = []
+for file in tqdm(all_files):
+    count = 0
+    json_name = os.path.join('train', 'train', 'annos', os.path.splitext(file)[0] + '.json')
+    image_name = os.path.join('train', 'train', 'image', file)
+    if int(os.path.splitext(file)[0]) >= 0:
+        img = Image.open(image_name)
+        width, height = img.size
+        with open(json_name, 'r') as f:
+            anno = json.loads(f.read())
+            val.append(anno)
+            for i in anno:
+                if i == 'source' or i == 'pair_id':
+                    continue
+                else:
+                    count += 1
+            item_count.append(count)
 
-
-# annotation 개수
-# ...
-
-
+print(Counter(item_count)) # 2: 112530, 1: 76107, 3: 2296, 4: 1018, 6: 6, 5: 3, 8: 1
+'''
 # pair 개수 : annotations 'pair_id'
 # user, shop 개수 => annotations 'source'
 # 카테고리 분포 'category_id'
 # style 분포 'style'
-#train_anno = {"pair_id": [], "source": [], "category_id": [], "style": []}
-#for anno in train_js['annotations']:
-#    train_anno['pair_id'].append(anno['pair_id'])
-#    train_anno['source'].append(anno['source'])
-#    train_anno['category_id'].append(anno['category_id'])
-#   train_anno['style'].append(anno['style'])
+train_anno = {"pair_id": [], "source": [], "category_id": [], "style": []}
+for anno in train_js['annotations']:
+    train_anno['pair_id'].append(anno['pair_id'])
+    train_anno['source'].append(anno['source'])
+    train_anno['category_id'].append(anno['category_id'])
+    train_anno['style'].append(anno['style'])
 
-#source_count = Counter(train_anno['source'])
-#category_count = Counter(train_anno['category_id'])
-#style_count = Counter(train_anno['style'])
+source_count = Counter(train_anno['source'])
+category_count = Counter(train_anno['category_id'])
+style_count = Counter(train_anno['style'])
 
 #print(len(set(train_anno['pair_id'])))
 #print(source_count)
 #print(category_count)
 #print(style_count)
+
+lst_name = ['short_sleeved_shirt', 'long_sleeved_shirt', 'short_sleeved_outwear', 'long_sleeved_outwear',
+            'vest', 'sling', 'shorts', 'trousers', 'skirt', 'short_sleeved_dress',
+            'long_sleeved_dress', 'vest_dress', 'sling_dress']
+
+cate_dict = {lst_name[i-1]:count for i,count in category_count.items()}
+
+
+'''
+plt.bar(range(len(cate_dict)), list(cate_dict.values()), align='center')
+plt.xticks(range(len(cate_dict)), list(cate_dict.keys()), rotation=90)
+plt.savefig('category_train.png')
+plt.show()
+'''
+plt.bar(range(len(style_count)), list(style_count.values()), align='center')
+plt.xticks(range(len(style_count)), list(style_count.keys()))
+plt.savefig('style_train.png')
+plt.show()
+
+
 
 # pair 개수 : 14555
 # source : Counter({'shop': 228558, 'user': 83628})
@@ -111,22 +145,22 @@ for image in val_js['images']:
     val_images['width'].append(image['width'])
     val_images['height'].append(image['height'])
 # width, height 분포 그리기
-
+'''
 plt.hist(val_images['width'], bins=50)
 plt.xticks(np.arange(0, 1000, 50), rotation=90)
 plt.xlim(0, 1000)
 plt.title('Image_width')
 plt.savefig('width.png')
 plt.show()
-
-
+'''
+'''
 plt.hist(val_images['height'], bins=50)
 plt.xticks(np.arange(0, 1000, 50), rotation=90)
 plt.xlim(0, 1000)
 plt.title('Image_height')
 plt.savefig('height.png')
 plt.show()
-
+'''
 
 #plt.xticks(np.arange(1, 8, 1))
 #plt.yticks(np.arange(0, 1.1, 0.1))
@@ -162,6 +196,26 @@ print(source_count)
 print(category_count)
 print(style_count)
 
+'''
+# category_id - lst_name 연결
+lst_name = ['short_sleeved_shirt', 'long_sleeved_shirt', 'short_sleeved_outwear', 'long_sleeved_outwear',
+            'vest', 'sling', 'shorts', 'trousers', 'skirt', 'short_sleeved_dress',
+            'long_sleeved_dress', 'vest_dress', 'sling_dress']
+
+cate_dict = {lst_name[i-1]:count for i,count in category_count.items()}
+
+
+plt.bar(range(len(cate_dict)), list(cate_dict.values()), align='center')
+plt.xticks(range(len(cate_dict)), list(cate_dict.keys()), rotation=90)
+plt.savefig('category_val.png')
+plt.show()
+
+plt.bar(range(len(style_count)), list(style_count.values()), align='center')
+plt.xticks(range(len(style_count)), list(style_count.keys()))
+plt.savefig('style_val.png')
+plt.show()
+
+'''
 
 
 
@@ -176,14 +230,6 @@ print(style_count)
 #plt.bar(range(len(D)), list(D.values()), align='center')
 #plt.xticks(range(len(D)), list(D.keys()))
 
-
-
-# category_id - lst_name 연결
-lst_name = ['short_sleeved_shirt', 'long_sleeved_shirt', 'short_sleeved_outwear', 'long_sleeved_outwear',
-            'vest', 'sling', 'shorts', 'trousers', 'skirt', 'short_sleeved_dress',
-            'long_sleeved_dress', 'vest_dress', 'sling_dress']
-
-cate_dict = {lst_name[i-1]:count for i,count in category_count.items()}
 
 
 
