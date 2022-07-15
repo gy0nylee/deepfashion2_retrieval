@@ -91,7 +91,7 @@ class queryData(Dataset):
 
     def __getitem__(self, i):
         query_img = Image.open(os.path.join(self.set, self.set, 'cropped', self.img_paths[self.user_idx[i]]))
-        true_idcs = [pair['p'][1] for pair in self.pairs if pair['p'][0] == self.user_idx[i]]
+        true_idcs = [pair['p'][1] for pair in self.pairs if pair['p'][0] == self.user_idx[i]] # true indices
         return query_img, true_idcs
 
 
@@ -123,11 +123,11 @@ num_workers = 8
 weight_decay = 0
 
 
-train_ds_t = TripletData(pairs=pairs_train, transform=transforms, img_paths=train_paths, set='train')
-val_ds_t = TripletData(pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
+train_ds_t = TripletData(pairs=pairs_train[:10000], transform=transforms, img_paths=train_paths, set='train')
+val_ds_t = TripletData(pairs=pairs_validation[:2000], transform=transforms, img_paths=train_paths, set='train')
 test_ds_t = TripletData(pairs=pairs_test, transform=transforms, img_paths=test_paths, set='validation')
 
-val_ds_q = queryData(user_idx=user_idx_val, pairs=pairs_validation, img_paths=train_paths, set='train')
+val_ds_q = queryData(user_idx=user_idx_val[:2000], pairs=pairs_validation, img_paths=train_paths, set='train')
 test_ds_q = queryData(user_idx=user_idx_test, pairs=pairs_test, img_paths=test_paths, set='validation')
 
 val_ds_g = galleryData(shop_idx=shop_idx_val, img_paths=train_paths, set='train')
@@ -168,12 +168,15 @@ test_loader_q = DataLoader(test_ds_q, batch_size=batch_size, num_workers=num_wor
 test_loader_g = DataLoader(test_ds_g, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
 
-def TopkAccuracy(true_idx_list,topk_idx_list):
+def TopkAccuracy(true_idcs_list,topk_idx_list):
     acc = 0
-    for i in range(len(true_idx_list)):
-        if i in topk_idx_list[i]:
+    for i in range(len(true_idcs_list)):
+        # true idcs중 하나라도 topk_idx_list에 있으면 +1
+        if len(set(true_idcs_list[i]).intersection(topk_idx_list[i])) > 0 :
            acc += 1
     return acc/len(true_idx_list)
+
+
 
 #### training
 def train(epoch, k=10):
@@ -213,15 +216,15 @@ def train(epoch, k=10):
         gallery_dict = {}
         for img, idx in tqdm(val_loader_g, desc='extracting gallery features'):
             output = model(img.cuda())
-            gallery_dict[idx] = output.data.cpu()
+            gallery_dict[idx] = output.data
             # torch.cat(features).numpy()
 
-        true_idx_list = []
-        for img, idx in tqdm(val_loader_q, desc='extracting query feature'):
+        true_idcs_list = []
+        for img, idcs in tqdm(val_loader_q, desc='extracting query feature'):
             output = model(img.cuda())
-            query_feature = output.data.cpu()
+            query_feature = output.data
             cos = nn.CosineSimilarity(dim=1)
-            true_idx_list.append(idx)
+            true_idcs_list.append(idcs)
 
             cos_dict = []
             for idx, feature in gallery_dict.items():
