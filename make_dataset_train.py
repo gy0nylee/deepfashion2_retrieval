@@ -16,25 +16,71 @@ from tqdm import tqdm
 import os
 import random
 import pickle
-from collate_modified import modified_collate
+#from collate_modified import modified_collate
+
 
 
 with open('pairs_train.pickle','rb') as f:
     pairs_train = pickle.load(f)
 with open('pairs_validation.pickle','rb') as f:
     pairs_validation = pickle.load(f)
-with open('pairs_test.pickle','rb') as f:
-    pairs_test = pickle.load(f)
+#with open('pairs_test.pickle','rb') as f:
+#    pairs_test = pickle.load(f)
 
 with open('shop_idx_val.pickle', 'rb') as f:
     shop_idx_val = pickle.load(f)
-with open('shop_idx_test.pickle','rb') as f:
-    shop_idx_test = pickle.load(f)
+#with open('shop_idx_test.pickle','rb') as f:
+#    shop_idx_test = pickle.load(f)
 
-with open('user_idx_val.pickle','rb') as f:
-    user_idx_val = pickle.load(f)
-with open('user_idx_test.pickle','rb') as f:
-    user_idx_test = pickle.load(f)
+with open('query_idx_val.pickle','rb') as f:
+    query_idx_val = pickle.load(f)
+#with open('query_idx_test.pickle','rb') as f:
+#    query_idx_test = pickle.load(f)
+
+with open('whole_images_train.pickle','rb') as f:
+    whole_images_train = pickle.load(f)
+
+'''train_idx = [t['idx'] for t in tqdm(whole_images_train)]
+class TempData(Dataset):
+    def __init__(self, idx, transform, img_paths):
+        self.idx = idx
+        self.transform = transform
+        self.img_paths = img_paths
+
+    def __len__(self):
+        return len(self.idx)
+    def __getitem__(self, i):
+        img = Image.open(os.path.join('train', 'train', 'cropped',self.img_paths[self.idx[i]]))
+        if self.transform is not None:
+            img = self.transform(img)
+        return img
+
+transforms = transforms.Compose([
+    transforms.Resize((224,224)),
+    transforms.ToTensor()
+])
+
+train_paths = os.listdir(os.path.join('train', 'train', 'cropped'))
+
+train_whole = TempData(idx=train_idx, transform=transforms, img_paths=train_paths)
+
+mean_whole = [np.mean(x.numpy(), axis=(1,2)) for x in tqdm(train_whole)]
+std_whole = [np.std(x.numpy(), axis=(1,2)) for x in tqdm(train_whole)]
+
+mean_0 = np.mean([m[0] for m in mean_whole])
+mean_1 = np.mean([m[1] for m in mean_whole])
+mean_2 = np.mean([m[2] for m in mean_whole])
+
+std_0 = np.mean([m[0] for m in std_whole])
+std_1 = np.mean([m[1] for m in std_whole])
+std_2 = np.mean([m[2] for m in std_whole])
+
+print('mean:', mean_0,mean_1,mean_2)
+print('std:', std_0,std_1,std_2)'''
+
+#mean: 0.5588843 0.5189913 0.5125264
+#std: 0.24053435 0.24247852 0.22778076
+
 
 
 '''
@@ -75,10 +121,10 @@ class TripletData(Dataset):
 
 transforms = transforms.Compose([
     transforms.Resize((224,224)),
-    transforms.ToTensor()
+    transforms.ToTensor(),
+    transforms.Normalize(mean=(0.5588843, 0.5189913,0.5125264), std = (0.24053435,0.24247852,0.22778076))
 ])
 
-#  transforms.Normalize(mean=( , , ), std = ( , , )
 
 
 class RetrievalData(Dataset):
@@ -100,7 +146,10 @@ class RetrievalData(Dataset):
 
         if self.source == 'user' :
             true_idcs = [pair['p'][1] for pair in self.pairs if pair['p'][0] == self.idx_set[i]] # true indices
-            return img, true_idcs
+            max_len = 82
+            padded_true_idcs = true_idcs + [-1]*(max_len-len(true_idcs))
+
+            return img, padded_true_idcs
 
         else:
             gallery_idx = self.idx_set[i]
@@ -113,7 +162,7 @@ test_paths = os.listdir(os.path.join('validation', 'validation', 'cropped'))
 
 
 # Dataloader
-batch_size = 32
+batch_size = 64
 lr = 0.001
 num_workers = 8
 weight_decay = 0
@@ -121,11 +170,12 @@ weight_decay = 0
 
 train_ds_t = TripletData(pairs=pairs_train[:10000], transform=transforms, img_paths=train_paths, set='train')
 val_ds_t = TripletData(pairs=pairs_validation[:2000], transform=transforms, img_paths=train_paths, set='train')
-val_ds_q = RetrievalData(idx_set=user_idx_val, source = 'user', pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
+val_ds_q = RetrievalData(idx_set=query_idx_val, source = 'user', pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
 val_ds_g = RetrievalData(idx_set=shop_idx_val, source = 'shop', pairs=None, transform=transforms, img_paths=train_paths, set='train')
 
+#length_list = [len(q) for _, q in tqdm(val_ds_q)]
+#print(max(length_list))
 
-train_ds_t
 
 
 '''
@@ -139,6 +189,7 @@ temp = Image.open(os.path.join('train', 'train', 'cropped',train_paths[train_pai
 temp.save('temp_image_og.png', 'png')
 print('original_size',temp.size)
 '''
+
 
 
 ### model
@@ -155,7 +206,7 @@ train_loader = DataLoader(train_ds_t, batch_size=batch_size, num_workers=num_wor
 val_loader = DataLoader(val_ds_t, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 #test_loader = DataLoader(test_ds_t, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
-val_loader_q = DataLoader(val_ds_q, batch_size=batch_size, num_workers=num_workers, pin_memory=True, collate_fn = modified_collate()) # 아직 에러남.....
+val_loader_q = DataLoader(val_ds_q, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 val_loader_g = DataLoader(val_ds_g, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
 #test_loader_q = DataLoader(test_ds_q, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
@@ -207,25 +258,43 @@ def train(epoch, k=10):
             val_loss += loss.item()
             pbar.set_description(f'validation - loss: {val_loss / (batch + 1)}')
 
-        gallery_dict = {}
+        features = []
         for img, idx in tqdm(val_loader_g, desc='extracting gallery features'):
             output = model(img.cuda())
-            gallery_dict[idx] = output.data
-            # torch.cat(features).numpy()
+            features.append(output.data)
+        gallery_features = torch.cat(features)
 
-        true_idcs_list = []
+        features = []
         for img, idcs in tqdm(val_loader_q, desc='extracting query feature'):
             output = model(img.cuda())
-            query_feature = output.data
-            cos = nn.CosineSimilarity(dim=1)
-            true_idcs_list.append(idcs)
+            features.append(output.data)
+        query_features = torch.cat(features)
 
-            cos_dict = []
-            for idx, feature in gallery_dict.items():
-                cos_dict[idx] = cos(query_feature, feature)
-            topk_idx_list.append(sorted(cos_dict.keys(), key=cos_dict.__getitem__, reverse=True)[:k])
+        print(gallery_features.shape)
+        print(query_features.shape)
+        print(query_features.unsqueeze(1).shape)
 
-    topk_acc = TopkAccuracy(true_idx_list, topk_idx_list)
+        cos = nn.CosineSimilarity(dim=-1)
+        cos(query_features.unsqueeze(1), gallery_features)
+
+
+
+        # gallery_dict[idx] = output.data
+        # torch.cat(feature)
+            #query_feature = output.data
+            #cos = nn.CosineSimilarity(dim=1)
+            #true_idcs_list.append(idcs)
+
+
+
+
+
+            #cos_dict = []
+            #for idx, feature in gallery_dict.items():
+            #    cos_dict[idx] = cos(query_feature, feature)
+            #topk_idx_list.append(sorted(cos_dict.keys(), key=cos_dict.__getitem__, reverse=True)[:k])
+
+    #topk_acc = TopkAccuracy(true_idx_list, topk_idx_list)
             # output -> numpy로 (torch.nn.functional cosine_similarity 사용시 tensor 그대로)
             # output.data
             # query의 corresponding true_idx
@@ -235,10 +304,10 @@ def train(epoch, k=10):
 
     val_losses.append(val_loss)
 
-    print(f'Epoch {epoch + 1} \t\t '
-          f'Training Loss: {train_loss / len(train_loader)} \t\t '
-          f'Validation Loss: {val_loss / len(val_loader)} \t\t'
-          f'Validation TopkAcc: {topk_acc} \t\t' )
+    #print(f'Epoch {epoch + 1} \t\t '
+    #      f'Training Loss: {train_loss / len(train_loader)} \t\t '
+    #      f'Validation Loss: {val_loss / len(val_loader)} \t\t'
+    #      f'Validation TopkAcc: {topk_acc} \t\t' )
     return val_loss
 
 
@@ -257,6 +326,5 @@ for epoch in range(epochs):
         if p == 0:
             print(f'Early Stopping. Min_val_loss : {min_val_loss}')
             break
-
 
 

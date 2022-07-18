@@ -69,13 +69,15 @@ for i in tqdm(whole_images_validation):
 
 with open('pairs_validation.pickle','wb') as f:
     pickle.dump(pairs, f)
-with open('user_idx_val.pickle','wb') as f:
-    pickle.dump(user_idx, f)
+
 with open('shop_idx_val.pickle','wb') as f:
     pickle.dump(shop_idx, f)
 
+u_idx_in_pairs = [idx['p'][0] for idx in pairs]
+query_idx_val = list(set(user_idx).intersection(u_idx_in_pairs))
 
-
+with open('query_idx_val.pickle','wb') as f:
+    pickle.dump(query_idx_val, f)
 
 
 # test set
@@ -106,8 +108,12 @@ for i in tqdm(whole_images_test):
 
 with open('pairs_test.pickle','wb') as f:
     pickle.dump(pairs, f)
-with open('user_idx_test.pickle','wb') as f:
-    pickle.dump(user_idx, f)
+
 with open('shop_idx_test.pickle','wb') as f:
     pickle.dump(shop_idx, f)
 
+u_idx_in_pairs = [idx['p'][0] for idx in pairs]
+query_idx_test = list(set(user_idx).intersection(u_idx_in_pairs))
+
+with open('query_idx_val.pickle','wb') as f:
+    pickle.dump(query_idx_test, f)
