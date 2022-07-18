@@ -18,7 +18,9 @@ import random
 import pickle
 #from collate_modified import modified_collate
 
-
+import torch, gc
+gc.collect()
+torch.cuda.empty_cache()
 
 with open('pairs_train.pickle','rb') as f:
     pairs_train = pickle.load(f)
@@ -40,7 +42,8 @@ with open('query_idx_val.pickle','rb') as f:
 with open('whole_images_train.pickle','rb') as f:
     whole_images_train = pickle.load(f)
 
-'''train_idx = [t['idx'] for t in tqdm(whole_images_train)]
+'''
+train_idx = [t['idx'] for t in tqdm(whole_images_train)]
 class TempData(Dataset):
     def __init__(self, idx, transform, img_paths):
         self.idx = idx
@@ -145,15 +148,15 @@ class RetrievalData(Dataset):
             img = self.transform(img)
 
         if self.source == 'user' :
-            true_idcs = [pair['p'][1] for pair in self.pairs if pair['p'][0] == self.idx_set[i]] # true indices
-            max_len = 82
-            padded_true_idcs = true_idcs + [-1]*(max_len-len(true_idcs))
+            #true_idcs = [pair['p'][1] for pair in self.pairs if pair['p'][0] == self.idx_set[i]] # true indices
+            #max_len = 82
+            #padded_true_idcs = torch.tensor(true_idcs + [-1]*(max_len-len(true_idcs)))
 
-            return img, padded_true_idcs
+            return img
 
         else:
-            gallery_idx = self.idx_set[i]
-            return img, gallery_idx
+            #gallery_idx = self.idx_set[i]
+            return img
 
 
 # img_paths
@@ -162,14 +165,14 @@ test_paths = os.listdir(os.path.join('validation', 'validation', 'cropped'))
 
 
 # Dataloader
-batch_size = 64
+batch_size = 32
 lr = 0.001
 num_workers = 8
 weight_decay = 0
 
 
-train_ds_t = TripletData(pairs=pairs_train[:10000], transform=transforms, img_paths=train_paths, set='train')
-val_ds_t = TripletData(pairs=pairs_validation[:2000], transform=transforms, img_paths=train_paths, set='train')
+train_ds_t = TripletData(pairs=pairs_train, transform=transforms, img_paths=train_paths, set='train')
+val_ds_t = TripletData(pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
 val_ds_q = RetrievalData(idx_set=query_idx_val, source = 'user', pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
 val_ds_g = RetrievalData(idx_set=shop_idx_val, source = 'shop', pairs=None, transform=transforms, img_paths=train_paths, set='train')
 
@@ -177,6 +180,12 @@ val_ds_g = RetrievalData(idx_set=shop_idx_val, source = 'shop', pairs=None, tran
 #print(max(length_list))
 
 
+#true_idcs_list = [[pair['p'][1] for pair in pairs_validation if pair['p'][0] == query_idx_val[i]] for i in tqdm(range(len(query_idx_val)))]
+#with open('true_idcs_list_val.pickle','wb') as f:
+#    pickle.dump(true_idcs_list, f)
+
+with open('true_idcs_list_val.pickle','rb') as f:
+    true_idcs_list_val = pickle.load(f)
 
 '''
 print(train_dataset[0])
@@ -213,11 +222,17 @@ val_loader_g = DataLoader(val_ds_g, batch_size=batch_size, num_workers=num_worke
 #test_loader_g = DataLoader(test_ds_g, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
 
 
-def TopkAccuracy(true_idcs_list,topk_idx_list):
+def TopkAccuracy(true_idcs_list, top_k_indices, shop_idx_val):
+    
+    #query : 15437, gallery : 45455
+    #true_idcs_list : query에 상응하는 true shop image의 index들 (train_path의 index, max_length로 (-1) padded) (15437,82) (Tensor)
+    #top_k_indices : top_k (cos similarity) indices(0~45454) -> gallery에 대한 index (15437, k) (Tensor)
+    #shop_idx_val : gallery의 true index list (train_path의 index) (45455)
+    
     acc = 0
-    for i in range(len(true_idcs_list)):
+    for i in tqdm(range(len(true_idcs_list)), desc='calculating topkacc'):
         # true idcs중 하나라도 topk_idx_list에 있으면 +1
-        if len(set(true_idcs_list[i]).intersection(topk_idx_list[i])) > 0 :
+        if len(set(true_idcs_list[i]).intersection(np.array(shop_idx_val)[top_k_indices[i]])) > 0 :
            acc += 1
     return acc/len(true_idcs_list)
 
@@ -227,10 +242,7 @@ def TopkAccuracy(true_idcs_list,topk_idx_list):
 def train(epoch, k=10):
     model.train()
     train_loss = 0
-    val_loss = 0
-    topk_idx_list = []
     train_losses = []
-    val_losses = []
 
     pbar = tqdm(train_loader)
     for batch, data in enumerate(pbar):
@@ -245,7 +257,11 @@ def train(epoch, k=10):
         loss.backward()
         optimizer.step()
     train_losses.append(train_loss)
+    return train_loss
 
+def validate(epoch, k=10):
+    val_loss = 0
+    val_losses = []
     model.eval()
     with torch.no_grad():
         pbar = tqdm(val_loader)
@@ -259,64 +275,38 @@ def train(epoch, k=10):
             pbar.set_description(f'validation - loss: {val_loss / (batch + 1)}')
 
         features = []
-        for img, idx in tqdm(val_loader_g, desc='extracting gallery features'):
+        for img in tqdm(val_loader_g, desc='extracting gallery features'):
             output = model(img.cuda())
             features.append(output.data)
         gallery_features = torch.cat(features)
 
-        features = []
-        for img, idcs in tqdm(val_loader_q, desc='extracting query feature'):
+        top_k_indices = []
+        for img in tqdm(val_loader_q, desc='extracting query feature'):
             output = model(img.cuda())
-            features.append(output.data)
-        query_features = torch.cat(features)
+            query_features = output.data
 
-        print(gallery_features.shape)
-        print(query_features.shape)
-        print(query_features.unsqueeze(1).shape)
-
-        cos = nn.CosineSimilarity(dim=-1)
-        cos(query_features.unsqueeze(1), gallery_features)
-
-
-
-        # gallery_dict[idx] = output.data
-        # torch.cat(feature)
-            #query_feature = output.data
-            #cos = nn.CosineSimilarity(dim=1)
-            #true_idcs_list.append(idcs)
-
-
-
-
-
-            #cos_dict = []
-            #for idx, feature in gallery_dict.items():
-            #    cos_dict[idx] = cos(query_feature, feature)
-            #topk_idx_list.append(sorted(cos_dict.keys(), key=cos_dict.__getitem__, reverse=True)[:k])
-
-    #topk_acc = TopkAccuracy(true_idx_list, topk_idx_list)
-            # output -> numpy로 (torch.nn.functional cosine_similarity 사용시 tensor 그대로)
-            # output.data
-            # query의 corresponding true_idx
-            # (query*gallery) cosine similarity 구해서 rank
-            # top-k개의 index 저장 -> k = ?
-        # top-k accuracy epoch마다 출력
-
+            # batch마다 (32:가능 64:불가능(OOM)) TOP-K 구하기 먼저 => TOP-K INDEX 출력
+            cos = nn.CosineSimilarity(dim=-1)
+            cos_sim = cos(query_features.unsqueeze(1), gallery_features)
+            _, indices = torch.topk(cos_sim, k = 5)
+            top_k_indices.append(indices)
+        top_k_indices = torch.cat(top_k_indices)
+        topk_acc = TopkAccuracy(true_idcs_list_val, top_k_indices.cpu(), shop_idx_val)
     val_losses.append(val_loss)
-
-    #print(f'Epoch {epoch + 1} \t\t '
-    #      f'Training Loss: {train_loss / len(train_loader)} \t\t '
-    #      f'Validation Loss: {val_loss / len(val_loader)} \t\t'
-    #      f'Validation TopkAcc: {topk_acc} \t\t' )
-    return val_loss
+    return val_loss, topk_acc
 
 
 
-epochs = 2
+epochs = 30
 min_val_loss = np.inf
 for epoch in range(epochs):
     p = patience
-    val_loss = train(epoch, k=10)
+    train_loss = train(epoch, k=10)
+    val_loss, topk_acc = validate(epoch, k=10)
+    print(f'Epoch {epoch + 1} \t\t '
+          f'Training Loss: {train_loss / len(train_loader)} \t\t '
+          f'Validation Loss: {val_loss / len(val_loader)} \t\t'
+          f'Validation TopkAcc: {topk_acc} \t\t')
     if min_val_loss > val_loss:
         min_val_loss = val_loss
         torch.save(model, model_path)
