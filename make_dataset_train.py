@@ -239,7 +239,7 @@ def TopkAccuracy(true_idcs_list, top_k_indices, shop_idx_val):
 
 
 #### training
-def train(epoch, k=10):
+def train(epoch):
     model.train()
     train_loss = 0
     train_losses = []
@@ -259,7 +259,7 @@ def train(epoch, k=10):
     train_losses.append(train_loss)
     return train_loss
 
-def validate(epoch, k=10):
+def validate(epoch, k=12):
     val_loss = 0
     val_losses = []
     model.eval()
@@ -288,7 +288,7 @@ def validate(epoch, k=10):
             # batch마다 (32:가능 64:불가능(OOM)) TOP-K 구하기 먼저 => TOP-K INDEX 출력
             cos = nn.CosineSimilarity(dim=-1)
             cos_sim = cos(query_features.unsqueeze(1), gallery_features)
-            _, indices = torch.topk(cos_sim, k = 5)
+            _, indices = torch.topk(cos_sim, k = k)
             top_k_indices.append(indices)
         top_k_indices = torch.cat(top_k_indices)
         topk_acc = TopkAccuracy(true_idcs_list_val, top_k_indices.cpu(), shop_idx_val)
@@ -301,8 +301,8 @@ epochs = 30
 min_val_loss = np.inf
 for epoch in range(epochs):
     p = patience
-    train_loss = train(epoch, k=10)
-    val_loss, topk_acc = validate(epoch, k=10)
+    train_loss = train(epoch)
+    val_loss, topk_acc = validate(epoch, k=20)
     print(f'Epoch {epoch + 1} \t\t '
           f'Training Loss: {train_loss / len(train_loader)} \t\t '
           f'Validation Loss: {val_loss / len(val_loader)} \t\t'
