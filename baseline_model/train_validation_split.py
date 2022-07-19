@@ -1,6 +1,5 @@
 from tqdm import tqdm
 import os
-import random
 import pickle
 
 # train, validation

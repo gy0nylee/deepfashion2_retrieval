@@ -16,11 +16,8 @@ from tqdm import tqdm
 import os
 import random
 import pickle
-#from collate_modified import modified_collate
 
-import torch, gc
-gc.collect()
-torch.cuda.empty_cache()
+
 
 with open('pairs_train.pickle','rb') as f:
     pairs_train = pickle.load(f)
@@ -131,9 +128,8 @@ transforms = transforms.Compose([
 
 
 class RetrievalData(Dataset):
-    def __init__(self, idx_set ,source, pairs, transform, img_paths, set):
+    def __init__(self, idx_set , pairs, transform, img_paths, set):
         self.idx_set = idx_set
-        self.source = source
         self.pairs = pairs
         self.transform = transform
         self.img_paths = img_paths
@@ -147,16 +143,7 @@ class RetrievalData(Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        if self.source == 'user' :
-            #true_idcs = [pair['p'][1] for pair in self.pairs if pair['p'][0] == self.idx_set[i]] # true indices
-            #max_len = 82
-            #padded_true_idcs = torch.tensor(true_idcs + [-1]*(max_len-len(true_idcs)))
-
-            return img
-
-        else:
-            #gallery_idx = self.idx_set[i]
-            return img
+        return img
 
 
 # img_paths
@@ -173,12 +160,11 @@ weight_decay = 0
 
 train_ds_t = TripletData(pairs=pairs_train, transform=transforms, img_paths=train_paths, set='train')
 val_ds_t = TripletData(pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
-val_ds_q = RetrievalData(idx_set=query_idx_val, source = 'user', pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
-val_ds_g = RetrievalData(idx_set=shop_idx_val, source = 'shop', pairs=None, transform=transforms, img_paths=train_paths, set='train')
+val_ds_q = RetrievalData(idx_set=query_idx_val, pairs=pairs_validation, transform=transforms, img_paths=train_paths, set='train')
+val_ds_g = RetrievalData(idx_set=shop_idx_val, pairs=None, transform=transforms, img_paths=train_paths, set='train')
 
 #length_list = [len(q) for _, q in tqdm(val_ds_q)]
 #print(max(length_list))
-
 
 #true_idcs_list = [[pair['p'][1] for pair in pairs_validation if pair['p'][0] == query_idx_val[i]] for i in tqdm(range(len(query_idx_val)))]
 #with open('true_idcs_list_val.pickle','wb') as f:
@@ -224,10 +210,12 @@ val_loader_g = DataLoader(val_ds_g, batch_size=batch_size, num_workers=num_worke
 
 def TopkAccuracy(true_idcs_list, top_k_indices, shop_idx_val):
     
-    #query : 15437, gallery : 45455
-    #true_idcs_list : query에 상응하는 true shop image의 index들 (train_path의 index, max_length로 (-1) padded) (15437,82) (Tensor)
-    #top_k_indices : top_k (cos similarity) indices(0~45454) -> gallery에 대한 index (15437, k) (Tensor)
-    #shop_idx_val : gallery의 true index list (train_path의 index) (45455)
+    """
+    query : 15437, gallery : 45455
+    true_idcs_list : query에 상응하는 true shop image의 index들 (train_path의 index, max_length로 (-1) padded) (15437,82) (Tensor)
+    top_k_indices : top_k (cos similarity) indices(0~45454) -> gallery에 대한 index (15437, k) (Tensor)
+    shop_idx_val : gallery의 true index list (train_path의 index) (45455)
+    """
     
     acc = 0
     for i in tqdm(range(len(true_idcs_list)), desc='calculating topkacc'):
@@ -313,6 +301,7 @@ for epoch in range(epochs):
         p = patience
     else:
         p -= 1
+        torch.save(model, model_path)
         if p == 0:
             print(f'Early Stopping. Min_val_loss : {min_val_loss}')
             break
