@@ -23,14 +23,14 @@ class DFdataset(Dataset):
         return len(self.idx)
 
     def __getitem__(self, i):
-        img =
-        label =
-        category =
-        source =
+        img = Image.open(os.path.join(self.set, self.set, 'cropped',self.img_paths[self.idx[i]]))
+        temp = self.img_paths[self.idx[i]].split('_')
+        label = hash(temp[0] +'_'+ temp[1]) # 새로운 label 생성 -> hash를 label로 사용해도 되나...
+        category = temp[5][:-4]
+        source = temp[2]
 
         if self.transform is not None:
-            img = self.transform(user_img)
-
+            img = self.transform(img)
 
         return img, label, category, source
 
