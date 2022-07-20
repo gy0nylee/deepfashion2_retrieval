@@ -25,9 +25,9 @@ class DFdataset(Dataset):
     def __getitem__(self, i):
         img = Image.open(os.path.join(self.set, self.set, 'cropped',self.img_paths[self.idx[i]]))
         temp = self.img_paths[self.idx[i]].split('_')
-        label = hash(temp[0] +'_'+ temp[1]) # 새로운 label 생성 -> hash를 label로 사용해도 되나...
+        label = int(temp[0] + temp[1].zfill(2))
         category = temp[5][:-4]
-        source = temp[2]
+        source = temp[2]   # source -> user = 1, shop = 0
 
         if self.transform is not None:
             img = self.transform(img)
