@@ -45,12 +45,12 @@ class HardTripletLoss(nn.Module):
 
         if self.hardest:
             # Get the hardest positive pairs
-            mask_anchor_positive = _get_anchor_positive_triplet_mask(user_labels, shop_labels)
+            mask_anchor_positive = _get_anchor_positive_triplet_mask(user_labels, shop_labels).float()
             valid_positive_dist = pairwise_dist * mask_anchor_positive
             hardest_positive_dist, _ = torch.max(valid_positive_dist, dim=1, keepdim=True)
 
             # Get the hardest negative pairs
-            mask_anchor_negative = _get_anchor_negative_triplet_mask(user_labels, shop_labels)
+            mask_anchor_negative = _get_anchor_negative_triplet_mask(user_labels, shop_labels).float()
             max_anchor_negative_dist, _ = torch.max(pairwise_dist, dim=1, keepdim=True) # row마다 max인 dist 출력
             
             anchor_negative_dist = pairwise_dist + max_anchor_negative_dist * (1.0 - mask_anchor_negative)
@@ -60,17 +60,17 @@ class HardTripletLoss(nn.Module):
             # Combine biggest d(a, p) and smallest d(a, n) into final triplet loss
             triplet_loss = F.relu(hardest_positive_dist - hardest_negative_dist + self.margin)  # relu -> max(0,_)
             triplet_loss = torch.mean(triplet_loss)
-            
-            
+
             
         else:
+            # pairwise_dist shape -> (user, shop)
             anc_pos_dist = pairwise_dist.unsqueeze(dim=2)
             anc_neg_dist = pairwise_dist.unsqueeze(dim=1)
 
-            # Compute a 3D tensor of size (batch_size, batch_size, batch_size)
+            # Compute a 3D tensor of size (batch_size, batch_size, batch_size) -> (user, shop, shop)
             # triplet_loss[i, j, k] will contain the triplet loss of anc=i, pos=j, neg=k
-            # Uses broadcasting where the 1st argument has shape (batch_size, batch_size, 1)
-            # and the 2nd (batch_size, 1, batch_size)
+            # Uses broadcasting where the 1st argument has shape (batch_size, batch_size, 1) -> (user,shop,1)
+            # and the 2nd (batch_size, 1, batch_size) -> (user, 1, shop)
             loss = anc_pos_dist - anc_neg_dist + self.margin
 
             mask = _get_triplet_mask(labels).float()
@@ -116,13 +116,13 @@ def _pairwise_distance(user_emb, shop_emb, squared=False, eps=1e-16):
 def _get_anchor_positive_triplet_mask(user_labels, shop_labels):  # mask dim = (user)*(shop), user
     # Return a 2D mask where mask[a, p] is True iff a and p are distinct and have same label.
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Check if user_labels[i] == shop_labels[j]
     mask = torch.unsqueeze(user_labels, 1) == torch.unsqueeze(shop_labels, 0)
 
 
-    return mask.float()
+    return mask
 
 
 def _get_anchor_negative_triplet_mask(user_labels, shop_labels):
@@ -132,14 +132,14 @@ def _get_anchor_negative_triplet_mask(user_labels, shop_labels):
     labels_equal = torch.unsqueeze(user_labels, 1) == torch.unsqueeze(shop_labels, 0)
     mask = labels_equal ^ 1
 
-    return mask.float()
+    return mask
 
 
 def _get_triplet_mask(user_labels, shop_labels):
     """Return a 3D mask where mask[a, p, n] is True iff the triplet (a, p, n) is valid.
     A triplet (i, j, k) is valid if:
-        - i, j, k are distinct
-        - labels[i] == labels[j] and labels[i] != labels[k]
+        - j, k are distinct
+        - labels[i] == labels[j] and labels[j] != labels[k]
     """
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -150,7 +150,7 @@ def _get_triplet_mask(user_labels, shop_labels):
     j_not_equal_k = torch.unsqueeze(indices_not_same, 0)
     distinct_indices = i_not_equal_j * i_not_equal_k * j_not_equal_k
 
-    # Check if labels[i] == labels[j] and labels[i] != labels[k]
+    # Check if labels[i] == labels[j] and labels[j] != labels[k]
     label_equal = torch.eq(torch.unsqueeze(labels, 0), torch.unsqueeze(labels, 1))
     i_equal_j = torch.unsqueeze(label_equal, 2)
     i_equal_k = torch.unsqueeze(label_equal, 1)
