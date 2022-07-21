@@ -282,6 +282,23 @@ def validate(epoch, k=12):
     val_losses.append(val_loss)
     return val_loss, topk_acc
 
+ features = []
+        for img in tqdm(val_loader_q, desc='extracting query feature'):
+            output = model(img.cuda())
+            features = output.data
+        query_features = torch.cat(features)
+
+        top_k_indices = []
+
+            # batch마다 (32:가능 64:불가능(OOM)) TOP-K 구하기 먼저 => TOP-K INDEX 출력
+            cos = nn.CosineSimilarity(dim=-1)
+            cos_sim = cos(query_features.unsqueeze(1), gallery_features)
+            _, indices = torch.topk(cos_sim, k = k)
+            top_k_indices.append(indices)
+        top_k_indices = torch.cat(top_k_indices)
+        topk_acc = TopkAccuracy(true_idcs_list_val, top_k_indices.cpu(), shop_idx_val)
+    val_losses.append(val_loss)
+    return val_loss, topk_acc
 
 
 epochs = 30

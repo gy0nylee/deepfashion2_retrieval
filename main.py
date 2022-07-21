@@ -11,8 +11,11 @@ import pickle
 import argparse
 import wandb
 
-from dataset import TripletData, RetrievalData
-from metric import TopkAccuracy
+
+from baseline_model.dataset import TripletData, RetrievalData
+from baseline_model.metric import TopkAccuracy
+from baseline_model.optimizer import get_optimizer
+from baseline_model.models import get_model
 
 with open('true_idcs_list_val.pickle','rb') as f:
     true_idcs_list_val = pickle.load(f)
@@ -37,22 +40,20 @@ parser = argparse.ArgumentParser(description='Baseline_model')
 parser.add_argument('--batch_size', '-b', type=int, default=64)
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--num_workers', '-nw',type=int, default=8)
-parser.add_argument('--weight_decay', '-wd',type=float, default=0)
-parser.add_argument('--optim', default=optim.Adam)
+parser.add_argument('--weight_decay', '-wd',type=float, default=5e-4)
+parser.add_argument('--momentum', '-m',  type=float, default=0.9)
+parser.add_argument('--eps', '-e', type=float, default=1e-8)
+parser.add_argument('--optim',  type=str, default='adam')
+parser.add_argument('--model',  type=str, default='resnet18')
 parser.add_argument('--epochs', type=int, default=20)
 parser.add_argument('--k', type=int, default=20)
+
 args = parser.parse_args()
 
-wandb.config.update(args)
 
 
 
 # Dataloader
-batch_size = 32
-lr = 0.001
-num_workers = 8
-weight_decay = 0
-
 
 transforms = transforms.Compose([
     transforms.Resize((224,224)),
@@ -71,10 +72,9 @@ val_ds_g = RetrievalData(idx_set=shop_idx_val, pairs=None, transform=transforms,
 
 
 ### model
-model = models.resnet18().cuda()
-optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+model = get_model(args).cuda()
+optimizer = get_optimizer(model.parameters(), args)
 triplet_loss = nn.TripletMarginLoss()
-
 
 train_loader = DataLoader(train_ds_t, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True)
 val_loader = DataLoader(val_ds_t, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True)
@@ -132,19 +132,19 @@ def validate(epoch, k):
             # batch마다 (32:가능 64:불가능(OOM)) TOP-K 구하기 먼저 => TOP-K INDEX 출력
             cos = nn.CosineSimilarity(dim=-1)
             cos_sim = cos(query_features.unsqueeze(1), gallery_features)
-            _, indices = torch.topk(cos_sim, k = k)
+            _, indices = torch.topk(cos_sim, k=k)
             top_k_indices.append(indices)
         top_k_indices = torch.cat(top_k_indices)
         topk_acc = TopkAccuracy(true_idcs_list_val, top_k_indices.cpu(), shop_idx_val)
     val_losses.append(val_loss)
     return val_loss, topk_acc
 
-model_path = 'best_model.pth'
-patience = 3
+#model_path = 'best_model.pth'
+#patience = 3
 
 min_val_loss = np.inf
 for epoch in range(args.epochs):
-    p = patience
+    #p = patience
     train_loss = train(epoch)
     val_loss, topk_acc = validate(epoch, args.k)
     wandb.log({"train_loss": train_loss, "val_loss": val_loss, "topk_acc": topk_acc}, step=epoch)
@@ -152,12 +152,13 @@ for epoch in range(args.epochs):
           f'Training Loss: {train_loss / len(train_loader)} \t\t '
           f'Validation Loss: {val_loss / len(val_loader)} \t\t'
           f'Validation TopkAcc: {topk_acc} \t\t')
-    torch.save(model, model_path)
+    #torch.save(model, model_path)
 
 
 
 
-   ''' if min_val_loss > val_loss:
+""" 
+  if min_val_loss > val_loss:
         min_val_loss = val_loss
         torch.save(model, model_path)
         p = patience
@@ -166,7 +167,8 @@ for epoch in range(args.epochs):
         torch.save(model, model_path)
         if p == 0:
             print(f'Early Stopping. Min_val_loss : {min_val_loss}')
-            break'''
+            break
+"""
 
 
 

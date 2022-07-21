@@ -27,9 +27,6 @@ class DFdataset(Dataset):
 
     def __getitem__(self, i):
         img = Image.open(os.path.join(self.set, self.set, 'cropped',self.img_paths[self.idx[i]]))
-
-
-
         temp = self.img_paths[self.idx[i]].split('_')
         label = int(temp[0] + temp[1].zfill(2))
         category = temp[5][:-4]

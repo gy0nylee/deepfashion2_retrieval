@@ -1,0 +1,51 @@
+program: main.py
+project: deepfashion2_retrieval
+method: bayes
+metric:
+  goal: maximize
+  name: topk_acc
+parameters:
+  model:
+    values:
+    - resnet18
+    - resnet34
+    - resnet50
+  batch_size:
+    values:
+    - 8
+    - 16
+    - 32
+  optim:
+    values:
+    - adam
+    - sgd
+    - rmsprop
+    - adagrad
+  lr:
+    distribution: log_uniform
+    max: -3
+    min: -9
+  num_workers:
+    values:
+    - 8
+  weight_decay:
+    distribution: log_uniform
+    max: -3
+    min: -9
+  momentum:
+    values:
+    - 0.5
+    - 0.9
+    - 0.99
+  eps:
+    distribution: uniform
+    max: 1e-4
+    min: 1e-9
+  epochs:
+    values:
+    - 20
+  k:
+    values:
+    - 20
+
+
