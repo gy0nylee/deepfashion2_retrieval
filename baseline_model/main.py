@@ -9,6 +9,7 @@ from tqdm import tqdm
 import os
 import pickle
 import argparse
+import wandb
 
 from dataset import TripletData, RetrievalData
 from metric import TopkAccuracy
@@ -26,6 +27,7 @@ with open('query_idx_val.pickle','rb') as f:
 with open('whole_images_train.pickle','rb') as f:
     whole_images_train = pickle.load(f)
 
+wandb.init()
 
 # img_paths
 train_paths = os.listdir(os.path.join('train', 'train', 'cropped'))
@@ -41,7 +43,7 @@ parser.add_argument('--epochs', type=int, default=20)
 parser.add_argument('--k', type=int, default=20)
 args = parser.parse_args()
 
-
+wandb.config.update(args)
 
 
 
@@ -145,6 +147,7 @@ for epoch in range(args.epochs):
     p = patience
     train_loss = train(epoch)
     val_loss, topk_acc = validate(epoch, args.k)
+    wandb.log({"train_loss": train_loss, "val_loss": val_loss, "topk_acc": topk_acc}, step=epoch)
     print(f'Epoch {epoch + 1} \t\t '
           f'Training Loss: {train_loss / len(train_loader)} \t\t '
           f'Validation Loss: {val_loss / len(val_loader)} \t\t'
