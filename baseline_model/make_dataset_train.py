@@ -286,13 +286,14 @@ def validate(epoch, k=12):
         for img in tqdm(val_loader_q, desc='extracting query feature'):
             output = model(img.cuda())
             features = output.data
-        query_features = torch.cat(features)
+        query_features = torch.cat(features),
 
         top_k_indices = []
-
+        query_chunks = torch.chunk(query_features, len(query_features)//32 +1)
+        for i in range(len(query_features)//32 +1):
             # batch마다 (32:가능 64:불가능(OOM)) TOP-K 구하기 먼저 => TOP-K INDEX 출력
             cos = nn.CosineSimilarity(dim=-1)
-            cos_sim = cos(query_features.unsqueeze(1), gallery_features)
+            cos_sim = cos(query_chunks[i].unsqueeze(1), gallery_features)
             _, indices = torch.topk(cos_sim, k = k)
             top_k_indices.append(indices)
         top_k_indices = torch.cat(top_k_indices)

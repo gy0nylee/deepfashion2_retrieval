@@ -1,12 +1,11 @@
 import numpy as np
 from tqdm import tqdm
 
-
 def TopkAccuracy(true_idcs_list, top_k_indices, shop_idx_val):
     """
     query : 15437, gallery : 45455
     true_idcs_list : query에 상응하는 true shop image의 index들 (train_path의 index, max_length로 (-1) padded) (15437,82) (Tensor)
-    top_k_indices : top_k (cos similarity) indices(0~45454) -> gallery에 대한 index (15437, k) (Tensor)
+    top_k_indices : top_k (cos similarity) indices(0~45454) -> gallery의 index (15437, k) (Tensor)
     shop_idx_val : gallery의 true index list (train_path의 index) (45455)
     """
 

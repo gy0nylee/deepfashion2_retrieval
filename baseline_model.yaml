@@ -12,9 +12,10 @@ parameters:
     - resnet50
   batch_size:
     values:
-    - 8
     - 16
     - 32
+    - 64
+    - 128
   optim:
     values:
     - adam
@@ -47,5 +48,9 @@ parameters:
   k:
     values:
     - 20
+  sampling:
+    values:
+    - random
+    - category
 
 
