@@ -19,7 +19,7 @@ from baseline_model.models import get_model
 
 
 
-#wandb.init()
+wandb.init()
 
 with open('true_idcs_list_val.pickle','rb') as f:
     true_idcs_list_val = pickle.load(f)
@@ -89,8 +89,8 @@ model = nn.DataParallel(model, device_ids=[0,1]).cuda()
 
 for param in model.parameters():
     param.requires_grad = False
-model.fc.weight.requires_grad = True
-model.fc.bias.requires_grad = True
+model.module.fc.weight.requires_grad = True
+model.module.fc.bias.requires_grad = True
 
 
 scaler = amp.GradScaler() # https://tutorials.pytorch.kr/recipes/recipes/amp_recipe.html
@@ -151,7 +151,7 @@ def validate(epoch, k):
         features = []
         for img in tqdm(val_loader_q, desc='extracting query feature'):
             output = model(img.cuda())
-            features = output.data
+            features.append(output.data)
         query_features = torch.cat(features)
 
         # 32개마다 TOP-K 구하기 먼저 => TOP-K INDEX 출력
@@ -163,7 +163,7 @@ def validate(epoch, k):
             _, indices = torch.topk(cos_sim, k=k)
             top_k_indices.append(indices)
         top_k_indices = torch.cat(top_k_indices)
-        topk_acc = TopkAccuracy(true_idcs_list_val, top_k_indices.cpu(), shop_idx_val)
+        topk_acc = TopkAccuracy(true_idcs_list_val, top_k_indices.cpu(), infos_val[1]['shop'])
     val_losses.append(val_loss)
     return val_loss, topk_acc
 
